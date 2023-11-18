@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using TMPro;
 
 public class GameManager : MonoBehaviour
 {
@@ -28,6 +29,7 @@ public class GameManager : MonoBehaviour
 
     // Event which is hapenning
     public Event  currentEvent;
+    public bool needUIUpdate;
 
     // Init Stats at the begenning
     private void InitStats() 
@@ -41,20 +43,52 @@ public class GameManager : MonoBehaviour
         this.paperwork = defaultValue;
     }
 
+    public float CalculateScore() 
+    {
+        return this.happyness*this.city*this.economy*this.paperwork*400;
+    }
+
     // Init some events
     private void InitEvents() 
     {
         this.listEvents = new List<Event>();
 
         AddEvent(new Event("Eval", "Est-ce que tu aimes le jeu ?", 
-                new List<Choice>(){ new Choice("Oui", 1.0f, 1.0f, 1.0f, 1.0f), 
-                                    new Choice("Non", -1.0f, -1.0f, -1.0f, -1.0f)}));
+                new List<Choice>(){ new Choice("Oui", 0.0f, 0.3f, 0.0f, 0.0f), 
+                                    new Choice("Non", 0.0f, -0.3f, 0.0f, 0.0f)}));
+        AddEvent(new Event("Gen", "Pourquoi notre génération pue ?", 
+                new List<Choice>(){ new Choice("42", 0.0f, 0.3f, 0.0f, 0.0f), 
+                                    new Choice("Women", 0.0f, -0.3f, 0.0f, 0.0f)}));
+        AddEvent(new Event("Avenir", "T'as un rêve ou un objectif ?", 
+                new List<Choice>(){ new Choice("Objectif", 0.0f, 0.3f, 0.0f, 0.0f), 
+                                    new Choice("Rêve", 0.0f, -0.3f, 0.0f, 0.0f)}));
+        AddEvent(new Event("Ennuie", "Tu préfères manger ou dormir ?", 
+                new List<Choice>(){ new Choice("Manger", 0.0f, 0.3f, 0.0f, 0.0f), 
+                                    new Choice("Dormir", 0.0f, -0.3f, 0.0f, 0.0f)}));
     }
 
     // Events Functions
-    private void AddEvent(Event Event) { this.listEvents.Add(Event); Debug.Log("Added the event: " + Event.GetTitle()); }
-    private void RemoveEvent(Event Event) { this.listEvents.Remove(Event); Debug.Log("Removed the event: " + Event.GetTitle()); }
-    private void PickRandomEvent() { this.currentEvent = this.listEvents[Random.Range(0,this.listEvents.Count-1)]; }
+    public void AddEvent(Event Event) { this.listEvents.Add(Event); Debug.Log("Added the event: " + Event.GetTitle()); }
+    public void RemoveEvent(Event Event) { this.listEvents.Remove(Event); Debug.Log("Removed the event: " + Event.GetTitle()); }
+    public void PickRandomEvent() 
+    { 
+        if(this.listEvents.Count > 0)
+        {
+            this.currentEvent = this.listEvents[Random.Range(0,this.listEvents.Count-1)]; 
+            //Debug Info about Event selected
+            string choiceString = this.currentEvent.GetTitle() + "\n"
+                                + this.currentEvent.GetDesc() + "\n";
+            foreach(Choice choice in this.currentEvent.GetChoices())
+            {
+                choiceString += choice.GetText() + " ";
+            }
+            Debug.Log("Event selected: " + choiceString);
+        }
+        else
+            this.currentEvent = null;
+
+        this.needUIUpdate = true;
+    }
 
     // Add value to stats (happyness, city, economy and paperwork)
     public void AddStats(float Happyness, float City, float Economy, float Paperwork) 
@@ -70,6 +104,23 @@ public class GameManager : MonoBehaviour
                 + "     Paperwork:" + this.paperwork);
     }
 
+    // Update the Event Window with the new current Event
+    public void UpdateEventUI() 
+    {
+        if(this.currentEvent != null)
+        {
+            GameObject.Find("Event Window/Description").GetComponent<TMP_Text>().text = this.currentEvent.GetDesc();
+            GameObject.Find("Event Window/Choices/Choice1/Text (TMP)").GetComponent<TMP_Text>().text = this.currentEvent.GetChoices()[0].GetText();
+            GameObject.Find("Event Window/Choices/Choice1").GetComponent<OnClickChoice>().ChoiceNumber = 0;
+            GameObject.Find("Event Window/Choices/Choice2/Text (TMP)").GetComponent<TMP_Text>().text = this.currentEvent.GetChoices()[1].GetText();
+            GameObject.Find("Event Window/Choices/Choice2").GetComponent<OnClickChoice>().ChoiceNumber = 1;
+        }
+        else
+        {
+            GameObject.Find("Event Window").SetActive(false);
+            Debug.Log("END \n Your score is " + CalculateScore());
+        }
+    }
 
     // Start is called before the first frame update
     void Start()
@@ -77,23 +128,23 @@ public class GameManager : MonoBehaviour
         InitStats();
         InitEvents();
         PickRandomEvent();
-
-        string choiceString = this.currentEvent.GetTitle() + "\n"
-                            + this.currentEvent.GetDesc() + "\n";
-        foreach(Choice choice in this.currentEvent.GetChoices())
-        {
-            choiceString += choice.GetText() + " ";
-        }
-        Debug.Log(choiceString);
-
-        this.currentEvent.GetChoices()[0].ApplyEffect();
-        this.currentEvent.GetChoices()[1].ApplyEffect();
     }
 
     // Update is called once per frame
     void Update()
     {
-        
+        // Check if it needs to update UI
+        if(this.needUIUpdate == true)
+        {
+            UpdateEventUI();
+            this.needUIUpdate = false;
+        }
+        if(this.happyness*this.city*this.economy*this.paperwork == 0.0f)
+        {
+            Debug.Log("YOU LOST");
+            GameObject.Find("Event Window").SetActive(false);
+            GameObject.Find("GameManager").SetActive(false);
+        }
     }
 }
 
@@ -138,5 +189,11 @@ public class Choice
     // Getter
     public string GetText() { return this.text; }
     // Apply Effect from that choice which change stats
-    public void ApplyEffect() { GameManager.Instance.AddStats(happyness, city, economy, paperwork); Debug.Log("Effect Applied for " + this.text); }
+    public void ApplyEffect() 
+    { 
+        GameManager.Instance.AddStats(happyness, city, economy, paperwork); 
+        Debug.Log("Effect Applied for " + this.text);
+        GameManager.Instance.RemoveEvent(GameManager.Instance.currentEvent);
+        GameManager.Instance.PickRandomEvent();
+    }
 }
